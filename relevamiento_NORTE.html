@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relevamiento de campo – Balcarce – Cuadrante NORTE</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  #map { height:100vh; }
+
+  #titulo {
+    position: absolute; top:10px; left:50%; transform:translateX(-50%);
+    background:rgba(255,255,255,0.95); padding:6px 16px; border-radius:6px;
+    z-index:1000; font-size:14px; font-weight:600; box-shadow:0 1px 5px rgba(0,0,0,0.3);
+    white-space:nowrap;
+  }
+
+  #contador {
+    position: absolute; top:54px; right:10px; background:rgba(255,255,255,0.95);
+    padding:8px 14px; border-radius:6px; z-index:1000; font-size:14px;
+    box-shadow:0 1px 5px rgba(0,0,0,0.3);
+  }
+
+  #btn-reiniciar {
+    position: absolute; top:54px; left:10px; background:#fff; border:1px solid #ccc;
+    padding:6px 14px; border-radius:4px; cursor:pointer; z-index:1000;
+    font-size:13px; box-shadow:0 1px 5px rgba(0,0,0,0.15);
+  }
+
+  #estado-gps {
+    position: absolute; bottom:10px; left:10px; background:rgba(255,255,255,0.95);
+    padding:5px 10px; border-radius:6px; z-index:1000; font-size:12px; color:#555;
+    box-shadow:0 1px 5px rgba(0,0,0,0.3);
+  }
+
+  #info-panel {
+    position: absolute; bottom:30px; left:50%; transform:translateX(-50%);
+    background:#fff; padding:14px 22px; border-radius:10px; box-shadow:0 2px 14px rgba(0,0,0,0.35);
+    z-index:1000; display:none; text-align:center; max-width:92%;
+  }
+  #info-panel p { margin:0 0 10px 0; font-size:15px; }
+  #info-panel button {
+    margin:0 6px; padding:8px 18px; border:none; border-radius:6px; cursor:pointer;
+    font-size:14px; font-weight:600;
+  }
+  #btn-confirmar { background:#43a047; color:#fff; }
+  #btn-ignorar { background:#e53935; color:#fff; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="titulo">Cuadrante NORTE – Relevamiento</div>
+<div id="contador">0 de 0 tramos relevados (0%)</div>
+<button id="btn-reiniciar">Reiniciar progreso</button>
+<div id="estado-gps">GPS: esperando señal…</div>
+<div id="info-panel">
+  <p id="info-text"></p>
+  <button id="btn-confirmar">Confirmar</button>
+  <button id="btn-ignorar">Ignorar</button>
+</div>
+
+<script>
+// ============================================================
+// DATOS DEL CUADRANTE (GeoJSON ya reproyectado a EPSG:4326)
+// ============================================================
+const geojsonData = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26705450874584, -37.83281053731514], [-58.26607281543096, -37.83356089803423]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "DIP. ALEJO LOPEZ DE ARMENTIA", "tipo": "Calle", "tramo_id": 0}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26897840869915, -37.83132134708741], [-58.26705450874584, -37.83281053731514]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "DIP. ALEJO LOPEZ DE ARMENTIA", "tipo": "Calle", "tramo_id": 1}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28605761785744, -37.83917480400961], [-58.285127375229024, -37.839889461429514]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "37", "tipo": "Calle", "tramo_id": 2}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.288890004963406, -37.83694586156871], [-58.287953253318875, -37.83768305969635]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "37", "tipo": "Calle", "tramo_id": 3}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.287953253318875, -37.83768305969635], [-58.28700350025367, -37.83843057764055]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "37", "tipo": "Calle", "tramo_id": 4}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28700350025367, -37.83843057764055], [-58.28605761785744, -37.83917480400961]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "37", "tipo": "Calle", "tramo_id": 5}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26705450874584, -37.83281053731514], [-58.26610413320166, -37.83204677373742]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C110- Combate de los Pozos", "tipo": "Calle", "tramo_id": 6}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26999260888105, -37.83515595254084], [-58.26892518585057, -37.83431719914571]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C110- Combate de los Pozos", "tipo": "Calle", "tramo_id": 7}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26892518585057, -37.83431719914571], [-58.26798544626089, -37.83356528931801]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C110- Combate de los Pozos", "tipo": "Calle", "tramo_id": 8}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26798544626089, -37.83356528931801], [-58.26705450874584, -37.83281053731514]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C110- Combate de los Pozos", "tipo": "Calle", "tramo_id": 9}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.282249338883, -37.84359403750697], [-58.27850765079351, -37.84652708342546]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 10}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.292209305029246, -37.83583108673276], [-58.28982631084129, -37.837689760591886]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 11}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28982631084129, -37.837689760591886], [-58.288887789928935, -37.838425667500736]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 12}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.288887789928935, -37.838425667500736], [-58.287915951165374, -37.839187675518716]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 13}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.287915951165374, -37.839187675518716], [-58.286985544033456, -37.839917174700254]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 14}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286985544033456, -37.839917174700254], [-58.28604885331429, -37.840634105416676]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 15}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28604885331429, -37.840634105416676], [-58.28507988562435, -37.841374980722776]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 16}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28507988562435, -37.841374980722776], [-58.284143849681364, -37.84210882532058]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 17}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.284143849681364, -37.84210882532058], [-58.28320006569187, -37.84286030770628]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 18}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28320006569187, -37.84286030770628], [-58.282249338883, -37.84359403750697]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C39. JUAN M de PUEYRREDON", "tipo": "Doble mano", "tramo_id": 19}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.284129379938776, -37.8436157213731], [-58.28319023031177, -37.8443551702519]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "41", "tipo": "Calle", "tramo_id": 20}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2869527123613, -37.841374347002464], [-58.286021076325966, -37.84212985083482]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "41", "tipo": "Calle", "tramo_id": 21}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286021076325966, -37.84212985083482], [-58.28508007454249, -37.84286686626173]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "41", "tipo": "Calle", "tramo_id": 22}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28508007454249, -37.84286686626173], [-58.284129379938776, -37.8436157213731]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "41", "tipo": "Calle", "tramo_id": 23}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26754376699771, -37.83706969637162], [-58.268611791274516, -37.83793771109201]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C104- Ayacucho", "tipo": "Calle", "tramo_id": 24}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.268611791274516, -37.83793771109201], [-58.269549454958984, -37.838679849958716]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C104- Ayacucho", "tipo": "Calle", "tramo_id": 25}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.269549454958984, -37.838679849958716], [-58.2704825269421, -37.8394437106379]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C104- Ayacucho", "tipo": "Calle", "tramo_id": 26}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2704825269421, -37.8394437106379], [-58.27142505660378, -37.84020848562766]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C104- Ayacucho", "tipo": "Calle", "tramo_id": 27}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286068461246025, -37.83467553676331], [-58.28856056844457, -37.83273156891945]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C31 - DR. JOSE CEREIJO", "tipo": "Doble mano", "tramo_id": 28}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.282302260965906, -37.837616215247515], [-58.28323517176132, -37.83688782502867]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C31 - DR. JOSE CEREIJO", "tipo": "Doble mano", "tramo_id": 29}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28323517176132, -37.83688782502867], [-58.284176457060646, -37.83615287368353]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C31 - DR. JOSE CEREIJO", "tipo": "Doble mano", "tramo_id": 30}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.284176457060646, -37.83615287368353], [-58.286068461246025, -37.83467553676331]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C31 - DR. JOSE CEREIJO", "tipo": "Doble mano", "tramo_id": 31}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27846697899253, -37.82859158970857], [-58.28121783530866, -37.82647096058557]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "Eva Peron", "tipo": "Doble mano", "tramo_id": 32}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.274688608815914, -37.83151536122413], [-58.27846697899253, -37.82859158970857]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "Eva Peron", "tipo": "Doble mano", "tramo_id": 33}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.263299346766736, -37.828322096769234], [-58.26138497153262, -37.82983092131442]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "1 - PRIMERA JUNTA", "tipo": "Calle", "tramo_id": 34}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286068461246025, -37.83467553676331], [-58.28796323299293, -37.83619688815421]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "128", "tipo": "Calle", "tramo_id": 35}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28796323299293, -37.83619688815421], [-58.288890004963406, -37.83694586156871]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "128", "tipo": "Calle", "tramo_id": 36}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.288890004963406, -37.83694586156871], [-58.28982631084129, -37.837689760591886]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "128", "tipo": "Calle", "tramo_id": 37}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.285120859741106, -37.83841248268516], [-58.28419383156867, -37.83913504502476]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "35", "tipo": "Calle", "tramo_id": 38}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28796323299293, -37.83619688815421], [-58.287022165737106, -37.83693046117492]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "35", "tipo": "Calle", "tramo_id": 39}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.287022165737106, -37.83693046117492], [-58.28607333068075, -37.83767006641578]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "35", "tipo": "Calle", "tramo_id": 40}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28607333068075, -37.83767006641578], [-58.285120859741106, -37.83841248268516]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "35", "tipo": "Calle", "tramo_id": 41}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286021076325966, -37.84212985083482], [-58.28507988562435, -37.841374980722776]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "118", "tipo": "Calle", "tramo_id": 42}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286954514138294, -37.842878897194105], [-58.286021076325966, -37.84212985083482]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "118", "tipo": "Calle", "tramo_id": 43}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27481156389324, -37.837576458115855], [-58.27383338684866, -37.83683222535629]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C112- Juan Manuel Bordeu", "tipo": "Calle", "tramo_id": 44}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27383338684866, -37.83683222535629], [-58.2728954529684, -37.8360768257853]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C112- Juan Manuel Bordeu", "tipo": "Calle", "tramo_id": 45}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28982631084129, -37.837689760591886], [-58.291635459243636, -37.83917409122757]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "S/N", "tipo": "Calle", "tramo_id": 46}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.291635459243636, -37.83917409122757], [-58.29358559491493, -37.840749759605856]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "S/N", "tipo": "Calle", "tramo_id": 47}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28121783530866, -37.82647096058557], [-58.284915615701806, -37.829614399007376]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "S/N", "tipo": "Calle", "tramo_id": 48}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.284915615701806, -37.829614399007376], [-58.28856056844457, -37.83273156891945]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "S/N", "tipo": "Calle", "tramo_id": 49}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28856056844457, -37.83273156891945], [-58.292209305029246, -37.83583108673276]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "S/N", "tipo": "Calle", "tramo_id": 50}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.287953253318875, -37.83768305969635], [-58.287022165737106, -37.83693046117492]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "126", "tipo": "Calle", "tramo_id": 51}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.288887789928935, -37.838425667500736], [-58.287953253318875, -37.83768305969635]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "126", "tipo": "Calle", "tramo_id": 52}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28419926500415, -37.83766247889743], [-58.285137272040025, -37.83692850219487]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "33", "tipo": "Calle", "tramo_id": 53}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28327071528123, -37.83838903317144], [-58.28419926500415, -37.83766247889743]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "33", "tipo": "Calle", "tramo_id": 54}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.284129379938776, -37.8436157213731], [-58.28320006569187, -37.84286030770628]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "114", "tipo": "Calle", "tramo_id": 55}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28507922023749, -37.844339717968076], [-58.284129379938776, -37.8436157213731]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "114", "tipo": "Calle", "tramo_id": 56}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.282302260965906, -37.837616215247515], [-58.28327071528123, -37.83838903317144]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "120", "tipo": "Calle", "tramo_id": 57}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28327071528123, -37.83838903317144], [-58.28419383156867, -37.83913504502476]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "120", "tipo": "Calle", "tramo_id": 58}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28419383156867, -37.83913504502476], [-58.285127375229024, -37.839889461429514]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "120", "tipo": "Calle", "tramo_id": 59}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.285127375229024, -37.839889461429514], [-58.28604885331429, -37.840634105416676]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "120", "tipo": "Calle", "tramo_id": 60}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28604885331429, -37.840634105416676], [-58.2869527123613, -37.841374347002464]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "120", "tipo": "Calle", "tramo_id": 61}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2869527123613, -37.841374347002464], [-58.28789896608815, -37.84213923817552]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "120", "tipo": "Calle", "tramo_id": 62}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28789896608815, -37.84213923817552], [-58.2898039622401, -37.84369989732497]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "120", "tipo": "Calle", "tramo_id": 63}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27081884340101, -37.82838814333133], [-58.26702751037053, -37.83134463594008]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "HUELLA VEHICULAR", "tipo": "Calle", "tramo_id": 64}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26607281543096, -37.83356089803423], [-58.26510886989134, -37.83282455276281]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C108- Salta", "tipo": "Calle", "tramo_id": 65}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26510886989134, -37.83282455276281], [-58.26138497153262, -37.82983092131442]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C108- Salta", "tipo": "Calle", "tramo_id": 66}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.272889227344635, -37.83904807972166], [-58.27194480412621, -37.838284720453075]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C108- Salta", "tipo": "Calle", "tramo_id": 67}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26901279098357, -37.83592168820945], [-58.26797909037224, -37.83506383895463]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C108- Salta", "tipo": "Calle", "tramo_id": 68}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26797909037224, -37.83506383895463], [-58.26703633638832, -37.834321946083044]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C108- Salta", "tipo": "Calle", "tramo_id": 69}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26703633638832, -37.834321946083044], [-58.26607281543096, -37.83356089803423]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C108- Salta", "tipo": "Calle", "tramo_id": 70}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27481156389324, -37.837576458115855], [-58.27853458783326, -37.83459676492504]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C23 - RAMON SORONDO", "tipo": "Calle", "tramo_id": 71}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27481156389324, -37.837576458115855], [-58.27384706907436, -37.838329886765585]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C23 - RAMON SORONDO", "tipo": "Calle", "tramo_id": 72}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27384706907436, -37.838329886765585], [-58.272889227344635, -37.83904807972166]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C23 - RAMON SORONDO", "tipo": "Calle", "tramo_id": 73}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.272889227344635, -37.83904807972166], [-58.271945896038694, -37.83980060861061]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C23 - RAMON SORONDO", "tipo": "Calle", "tramo_id": 74}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27142505660378, -37.84020848562766], [-58.27096865952553, -37.840522201879146]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C23 - RAMON SORONDO", "tipo": "Calle", "tramo_id": 75}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.271945896038694, -37.83980060861061], [-58.27142505660378, -37.84020848562766]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C23 - RAMON SORONDO", "tipo": "Calle", "tramo_id": 76}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26798544626089, -37.83356528931801], [-58.26703633638832, -37.834321946083044]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "JUAN MANUEL FANGIO", "tipo": "Calle", "tramo_id": 77}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26893652678632, -37.832858716046495], [-58.26798544626089, -37.83356528931801]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "JUAN MANUEL FANGIO", "tipo": "Calle", "tramo_id": 78}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26138497153262, -37.82983092131442], [-58.25949864729845, -37.83130270962601]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C1- PRIMERA JUNTA", "tipo": "Calle", "tramo_id": 79}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.271945896038694, -37.83980060861061], [-58.27100514174999, -37.83901907455963]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C106- Talcahuano", "tipo": "Calle", "tramo_id": 80}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.285137272040025, -37.83692850219487], [-58.284176457060646, -37.83615287368353]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "124", "tipo": "Calle", "tramo_id": 81}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.287915951165374, -37.839187675518716], [-58.28700350025367, -37.83843057764055]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "124", "tipo": "Calle", "tramo_id": 82}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28700350025367, -37.83843057764055], [-58.28607333068075, -37.83767006641578]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "124", "tipo": "Calle", "tramo_id": 83}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28607333068075, -37.83767006641578], [-58.285137272040025, -37.83692850219487]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "124", "tipo": "Calle", "tramo_id": 84}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.268611791274516, -37.83793771109201], [-58.26816931279953, -37.83827603049783]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C17 - BARTOLOME MITRE", "tipo": "Calle", "tramo_id": 85}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26912754104611, -37.83753787972859], [-58.268611791274516, -37.83793771109201]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C17 - BARTOLOME MITRE", "tipo": "Calle", "tramo_id": 86}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28507922023749, -37.844339717968076], [-58.28412307717833, -37.84510977286067]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "43", "tipo": "Calle", "tramo_id": 87}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.291635459243636, -37.83917409122757], [-58.28789896608815, -37.84213923817552]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "43", "tipo": "Calle", "tramo_id": 88}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28789896608815, -37.84213923817552], [-58.286954514138294, -37.842878897194105]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "43", "tipo": "Calle", "tramo_id": 89}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286954514138294, -37.842878897194105], [-58.286009099100504, -37.84361928753133]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "43", "tipo": "Calle", "tramo_id": 90}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286009099100504, -37.84361928753133], [-58.28507922023749, -37.844339717968076]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "43", "tipo": "Calle", "tramo_id": 91}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26892518585057, -37.83431719914571], [-58.26797909037224, -37.83506383895463]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "JOSE GARIBALDI", "tipo": "Calle", "tramo_id": 92}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26984222450748, -37.83360058548557], [-58.26892518585057, -37.83431719914571]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "JOSE GARIBALDI", "tipo": "Calle", "tramo_id": 93}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27383338684866, -37.83683222535629], [-58.27290121236703, -37.83754628219913]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "INT. ERRECABORDE", "tipo": "Calle", "tramo_id": 94}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2704825269421, -37.8394437106379], [-58.270047343400265, -37.83978296788621]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "INT. ERRECABORDE", "tipo": "Calle", "tramo_id": 95}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27100514174999, -37.83901907455963], [-58.2704825269421, -37.8394437106379]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "INT. ERRECABORDE", "tipo": "Calle", "tramo_id": 96}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26610413320166, -37.83204677373742], [-58.26510886989134, -37.83282455276281]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C9 - ALMTE. GUILLERMO BROWN", "tipo": "Calle", "tramo_id": 97}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26702751037053, -37.83134463594008], [-58.26610413320166, -37.83204677373742]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C9 - ALMTE. GUILLERMO BROWN", "tipo": "Calle", "tramo_id": 98}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.282249338883, -37.84359403750697], [-58.28319023031177, -37.8443551702519]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "112", "tipo": "Calle", "tramo_id": 99}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28319023031177, -37.8443551702519], [-58.28412307717833, -37.84510977286067]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "112", "tipo": "Calle", "tramo_id": 100}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26702751037053, -37.83134463594008], [-58.263299346766736, -37.828322096769234]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C112- Juan Manuel Bordeu", "tipo": "Calle", "tramo_id": 101}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28419926500415, -37.83766247889743], [-58.28323517176132, -37.83688782502867]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "122", "tipo": "Calle", "tramo_id": 102}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286985544033456, -37.839917174700254], [-58.28605761785744, -37.83917480400961]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "122", "tipo": "Calle", "tramo_id": 103}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28605761785744, -37.83917480400961], [-58.285120859741106, -37.83841248268516]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "122", "tipo": "Calle", "tramo_id": 104}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.285120859741106, -37.83841248268516], [-58.28419926500415, -37.83766247889743]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "122", "tipo": "Calle", "tramo_id": 105}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.28508007454249, -37.84286686626173], [-58.284143849681364, -37.84210882532058]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "116", "tipo": "Calle", "tramo_id": 106}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.286009099100504, -37.84361928753133], [-58.28508007454249, -37.84286686626173]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "116", "tipo": "Calle", "tramo_id": 107}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27081884340101, -37.82838814333133], [-58.273639703542095, -37.83061469340837]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C120- Guadalupe Aramendia de Lopardo", "tipo": "Calle", "tramo_id": 108}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.274688608815914, -37.83151536122413], [-58.27853458783326, -37.83459676492504]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C120- Guadalupe Aramendia de Lopardo", "tipo": "Calle", "tramo_id": 109}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.269549454958984, -37.838679849958716], [-58.26910761845626, -37.83902894099605]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "JULIO A. ROCA", "tipo": "Calle", "tramo_id": 110}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2700613746811, -37.83826821358399], [-58.269549454958984, -37.838679849958716]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "JULIO A. ROCA", "tipo": "Calle", "tramo_id": 111}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26984222450749, -37.83360058548557], [-58.27177703661011, -37.83210409036155]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 112}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.268936526786305, -37.832858716046495], [-58.272713219947946, -37.82991906669497]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 113}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26989506161416, -37.8306043398772], [-58.268914887073514, -37.829872899914974]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C116- Arq Francisco Salamone", "tipo": null, "tramo_id": 114}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27228644181092, -37.83176584289344], [-58.26943234535282, -37.82946938112465]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": "C118- Gregoria Lecumberri", "tipo": null, "tramo_id": 115}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2727160708806, -37.83138365744894], [-58.2698691813397, -37.8291287270295]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 116}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.273182059955495, -37.83102416693414], [-58.27036000073883, -37.82874596969813]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 117}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.269924171916216, -37.83056201687789], [-58.27175662506253, -37.82914601466996]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 118}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.26749216382221, -37.83171893429939], [-58.26939877742611, -37.830251411825095]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 119}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2684422168667, -37.83247259951123], [-58.270345077229216, -37.83099161605843]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 120}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27128287549361, -37.83248927176172], [-58.27238714872669, -37.83329609614032]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 121}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.2728954529684, -37.83607682578528], [-58.27477375862664, -37.83454836860907]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 122}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.289803962240086, -37.84369989732497], [-58.293585594914944, -37.840749759605856]]]}, "properties": {"alturadesd": 0.0, "alturahast": 0.0, "anchoinici": 0.0, "anchofinal": 0.0, "nombre": null, "tipo": null, "tramo_id": 123}}, {"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[-58.27121631397068, -37.831743217999886], [-58.269391775184374, -37.83320081035974]]]}, "properties": {"alturadesd": null, "alturahast": null, "anchoinici": null, "anchofinal": null, "nombre": null, "tipo": null, "tramo_id": 124}}]};
+
+const CUADRANTE = "NORTE";
+const MAP_CENTER = [-37.83649902200551, -58.2765421211067];   // [lat, lon]
+const MAP_ZOOM = 15;
+
+// Umbral de detección en metros. 35 m porque el relevamiento es en vehículo
+// (a pie conviene bajarlo a 20-25 m para mayor precisión).
+const UMBRAL_METROS = 35;
+
+// Velocidad mínima (km/h) para considerar el movimiento como desplazamiento real
+// y no ruido de GPS estando detenido. Si vas muy lento/parado, no recalcula candidato.
+const VELOCIDAD_MIN_KMH = 3;
+
+const STORAGE_KEY = 'balcarce_relevamiento_' + CUADRANTE;
+
+// ------------------------------------------------------------
+const map = L.map('map').setView(MAP_CENTER, MAP_ZOOM);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+let tramos = [];          // { id, nombre, tipo, layer, segments: [[latlng,latlng], ...] }
+let confirmados = new Set();
+let marker = null;
+let lastLatLng = null;
+let lastTimestamp = null;
+let currentCandidateId = null;
+
+function cargarProgreso() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try { confirmados = new Set(JSON.parse(saved)); } catch(e) { confirmados = new Set(); }
+  }
+}
+
+function guardarProgreso() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...confirmados]));
+}
+
+function reiniciarProgreso() {
+  confirmados.clear();
+  guardarProgreso();
+  location.reload();
+}
+
+// Distancia en metros de un punto a un segmento (proyección sobre el segmento)
+function distPuntoSegmento(latlng, segA, segB) {
+  const p = latlng, a = segA, b = segB;
+  const ab = b.distanceTo(a);
+  if (ab === 0) return p.distanceTo(a);
+  const d = ((p.lat - a.lat) * (b.lat - a.lat) + (p.lng - a.lng) * (b.lng - a.lng)) / (ab * ab);
+  let proj;
+  if (d <= 0) proj = a;
+  else if (d >= 1) proj = b;
+  else proj = L.latLng(a.lat + d * (b.lat - a.lat), a.lng + d * (b.lng - a.lng));
+  return p.distanceTo(proj);
+}
+
+function construirEtiqueta(props) {
+  let label = props.nombre ? props.nombre : '(sin nombre)';
+  if (props.alturadesd || props.alturahast) {
+    label += ` (altura ${props.alturadesd}-${props.alturahast})`;
+  }
+  if (props.tipo) label += ` [${props.tipo}]`;
+  return label;
+}
+
+function cargarTramos() {
+  tramos = [];
+  geojsonData.features.forEach(feature => {
+    const id = feature.properties.tramo_id;
+    const color = confirmados.has(id) ? '#2e7d32' : '#d32f2f';
+
+    // MultiLineString: puede tener una o varias sub-líneas
+    const segmentsLatLng = [];
+    feature.geometry.coordinates.forEach(sub => {
+      const pts = sub.map(c => L.latLng(c[1], c[0])); // [lon,lat] -> latlng
+      for (let i = 0; i < pts.length - 1; i++) {
+        segmentsLatLng.push([pts[i], pts[i + 1]]);
+      }
+    });
+
+    const layer = L.polyline(
+      feature.geometry.coordinates.map(sub => sub.map(c => [c[1], c[0]])),
+      { color: color, weight: 5, opacity: 0.85 }
+    ).addTo(map);
+
+    layer.bindTooltip(construirEtiqueta(feature.properties));
+
+    tramos.push({
+      id: id,
+      props: feature.properties,
+      layer: layer,
+      segments: segmentsLatLng
+    });
+  });
+  actualizarContador();
+}
+
+function actualizarContador() {
+  const total = tramos.length;
+  const hechos = tramos.filter(t => confirmados.has(t.id)).length;
+  const pct = total ? Math.round((hechos / total) * 100) : 0;
+  document.getElementById('contador').textContent = `${hechos} de ${total} tramos relevados (${pct}%)`;
+}
+
+function confirmarTramo(tramo) {
+  confirmados.add(tramo.id);
+  tramo.layer.setStyle({ color: '#2e7d32' });
+  guardarProgreso();
+  actualizarContador();
+  ocultarPanel();
+  currentCandidateId = null;
+}
+
+function ocultarPanel() {
+  document.getElementById('info-panel').style.display = 'none';
+}
+
+function mostrarPanel(tramo) {
+  document.getElementById('info-text').textContent =
+    `¿Confirmar ${construirEtiqueta(tramo.props)} como relevado?`;
+  document.getElementById('info-panel').style.display = 'block';
+  document.getElementById('btn-confirmar').onclick = () => confirmarTramo(tramo);
+  document.getElementById('btn-ignorar').onclick = () => ocultarPanel();
+}
+
+function buscarTramoMasCercano(latlng) {
+  let best = null;
+  let bestDist = Infinity;
+  tramos.forEach(t => {
+    if (confirmados.has(t.id)) return;
+    t.segments.forEach(([a, b]) => {
+      const d = distPuntoSegmento(latlng, a, b);
+      if (d < bestDist) {
+        bestDist = d;
+        best = t;
+      }
+    });
+  });
+  return { tramo: best, dist: bestDist };
+}
+
+function onPositionUpdate(pos) {
+  const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+  const now = pos.timestamp || Date.now();
+
+  document.getElementById('estado-gps').textContent =
+    `GPS: activo (precisión ±${Math.round(pos.coords.accuracy)} m)`;
+
+  if (!marker) {
+    marker = L.marker(latlng).addTo(map);
+  } else {
+    marker.setLatLng(latlng);
+  }
+
+  // Calcular velocidad aproximada para filtrar ruido cuando está detenido
+  let velocidadKmh = null;
+  if (lastLatLng && lastTimestamp) {
+    const distM = latlng.distanceTo(lastLatLng);
+    const dtSeg = (now - lastTimestamp) / 1000;
+    if (dtSeg > 0) velocidadKmh = (distM / dtSeg) * 3.6;
+  }
+  lastLatLng = latlng;
+  lastTimestamp = now;
+
+  // Si está claramente detenido, no tocar el panel actual (evita parpadeo en esquinas)
+  if (velocidadKmh !== null && velocidadKmh < VELOCIDAD_MIN_KMH && currentCandidateId !== null) {
+    return;
+  }
+
+  const { tramo, dist } = buscarTramoMasCercano(latlng);
+
+  if (tramo && dist < UMBRAL_METROS) {
+    if (currentCandidateId !== tramo.id) {
+      currentCandidateId = tramo.id;
+      mostrarPanel(tramo);
+    }
+  } else {
+    if (currentCandidateId !== null) {
+      currentCandidateId = null;
+      ocultarPanel();
+    }
+  }
+}
+
+function onPositionError(err) {
+  document.getElementById('estado-gps').textContent = 'GPS: error – ' + err.message;
+}
+
+// init
+cargarProgreso();
+cargarTramos();
+
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(onPositionUpdate, onPositionError, {
+    enableHighAccuracy: true,
+    maximumAge: 3000,
+    timeout: 10000
+  });
+} else {
+  document.getElementById('estado-gps').textContent = 'GPS no soportado en este navegador.';
+}
+
+document.getElementById('btn-reiniciar').addEventListener('click', () => {
+  if (confirm('¿Reiniciar todo el progreso de este cuadrante? Se perderán los tramos confirmados.')) {
+    reiniciarProgreso();
+  }
+});
+</script>
+</body>
+</html>
