@@ -48,6 +48,13 @@
   }
   #btn-confirmar { background:#43a047; color:#fff; }
   #btn-ignorar { background:#e53935; color:#fff; }
+
+  #opciones-lista { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+  .opcion-btn {
+    background:#43a047; color:#fff; border:none; border-radius:6px;
+    padding:9px 14px; font-size:14px; font-weight:600; cursor:pointer; text-align:left;
+  }
+  .opcion-btn:active { background:#2e7d32; }
 </style>
 </head>
 <body>
@@ -58,7 +65,7 @@
 <div id="estado-gps">GPS: esperando señal…</div>
 <div id="info-panel">
   <p id="info-text"></p>
-  <button id="btn-confirmar">Confirmar</button>
+  <div id="opciones-lista"></div>
   <button id="btn-ignorar">Ignorar</button>
 </div>
 
@@ -72,9 +79,10 @@ const CUADRANTE = "NE";
 const MAP_CENTER = [-37.834359447740695, -58.2515282697539];   // [lat, lon]
 const MAP_ZOOM = 15;
 
-// Umbral de detección en metros. 35 m porque el relevamiento es en vehículo
-// (a pie conviene bajarlo a 20-25 m para mayor precisión).
-const UMBRAL_METROS = 35;
+// Umbral de detección en metros. Se bajó de 35 a 25 m porque en las esquinas
+// con varias calles cercanas convenía acotar el radio y, además, mostrar
+// todas las opciones candidatas en vez de adivinar una sola.
+const UMBRAL_METROS = 25;
 
 // Velocidad mínima (km/h) para considerar el movimiento como desplazamiento real
 // y no ruido de GPS estando detenido. Si vas muy lento/parado, no recalcula candidato.
@@ -179,6 +187,19 @@ function confirmarTramo(tramo) {
   tramo.layer.setStyle({ color: '#2e7d32' });
   guardarProgreso();
   actualizarContador();
+
+  // Si quedan otros candidatos en la misma posición (esquina con varias cuadras),
+  // los mostramos de nuevo en vez de cerrar el panel de golpe.
+  if (lastLatLng) {
+    const restantes = buscarTramosCercanos(lastLatLng);
+    if (restantes.length > 0) {
+      const setId = restantes.map(c => c.tramo.id).sort().join(',');
+      currentCandidateId = setId;
+      mostrarPanel(restantes);
+      return;
+    }
+  }
+
   ocultarPanel();
   currentCandidateId = null;
 }
@@ -187,28 +208,44 @@ function ocultarPanel() {
   document.getElementById('info-panel').style.display = 'none';
 }
 
-function mostrarPanel(tramo) {
-  document.getElementById('info-text').textContent =
-    `¿Confirmar ${construirEtiqueta(tramo.props)} como relevado?`;
+function mostrarPanel(candidatos) {
+  const esUnico = candidatos.length === 1;
+  document.getElementById('info-text').textContent = esUnico
+    ? `¿Confirmar este tramo como relevado?`
+    : `Varios tramos cerca. Elegí cuál relevaste:`;
+
+  const lista = document.getElementById('opciones-lista');
+  lista.innerHTML = '';
+  candidatos.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'opcion-btn';
+    btn.textContent = construirEtiqueta(c.tramo.props) + ` (~${Math.round(c.dist)} m)`;
+    btn.onclick = () => confirmarTramo(c.tramo);
+    lista.appendChild(btn);
+  });
+
   document.getElementById('info-panel').style.display = 'block';
-  document.getElementById('btn-confirmar').onclick = () => confirmarTramo(tramo);
   document.getElementById('btn-ignorar').onclick = () => ocultarPanel();
 }
 
-function buscarTramoMasCercano(latlng) {
-  let best = null;
-  let bestDist = Infinity;
+function buscarTramosCercanos(latlng) {
+  // Devuelve TODOS los tramos pendientes dentro del umbral, ordenados por distancia.
+  // En esquinas con varias calles cercanas, esto permite elegir cuál corresponde
+  // en vez de adivinar automáticamente el más cercano.
+  const candidatos = [];
   tramos.forEach(t => {
     if (confirmados.has(t.id)) return;
+    let bestDistTramo = Infinity;
     t.segments.forEach(([a, b]) => {
       const d = distPuntoSegmento(latlng, a, b);
-      if (d < bestDist) {
-        bestDist = d;
-        best = t;
-      }
+      if (d < bestDistTramo) bestDistTramo = d;
     });
+    if (bestDistTramo < UMBRAL_METROS) {
+      candidatos.push({ tramo: t, dist: bestDistTramo });
+    }
   });
-  return { tramo: best, dist: bestDist };
+  candidatos.sort((a, b) => a.dist - b.dist);
+  return candidatos;
 }
 
 function onPositionUpdate(pos) {
@@ -239,12 +276,15 @@ function onPositionUpdate(pos) {
     return;
   }
 
-  const { tramo, dist } = buscarTramoMasCercano(latlng);
+  const candidatos = buscarTramosCercanos(latlng);
 
-  if (tramo && dist < UMBRAL_METROS) {
-    if (currentCandidateId !== tramo.id) {
-      currentCandidateId = tramo.id;
-      mostrarPanel(tramo);
+  if (candidatos.length > 0) {
+    // ID compuesto: si cambia el conjunto de tramos candidatos (no solo el más cercano),
+    // se vuelve a mostrar el panel; si es el mismo conjunto, no parpadea.
+    const setId = candidatos.map(c => c.tramo.id).sort().join(',');
+    if (currentCandidateId !== setId) {
+      currentCandidateId = setId;
+      mostrarPanel(candidatos);
     }
   } else {
     if (currentCandidateId !== null) {
